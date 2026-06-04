@@ -1,0 +1,836 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Petualangan Geografis Indonesia</title>
+    <!-- Tailwind CSS untuk styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome untuk ikon -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Poppins', sans-serif;
+            background-color: #f0fdfa; /* Light teal background */
+            overflow-x: hidden;
+        }
+        
+        /* Menyembunyikan semua halaman secara default */
+        .page {
+            display: none;
+            min-height: 100vh;
+            padding: 2rem;
+            animation: fadeIn 0.5s ease-in-out;
+        }
+        
+        /* Menampilkan halaman yang aktif */
+        .page.active {
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Animasi sederhana */
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes float {
+            0% { transform: translateY(0px); }
+            50% { transform: translateY(-10px); }
+            100% { transform: translateY(0px); }
+        }
+
+        .floating {
+            animation: float 3s ease-in-out infinite;
+        }
+
+        /* Styling tambahan untuk elemen game */
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.9);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.5);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #0ea5e9, #2563eb);
+            color: white;
+            transition: all 0.3s ease;
+        }
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(37, 99, 235, 0.4);
+        }
+
+        .level-card {
+            transition: all 0.3s ease;
+        }
+        .level-card:hover:not(.locked) {
+            transform: scale(1.05);
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+        }
+        .locked {
+            opacity: 0.6;
+            cursor: not-allowed;
+            filter: grayscale(100%);
+        }
+
+        /* Area Game */
+        #game-area {
+            background-color: #f8fafc;
+            border-radius: 1rem;
+            padding: 1.5rem;
+            box-shadow: inset 0 2px 10px rgba(0,0,0,0.05);
+        }
+
+        /* Navbar khusus IFP (ukuran lebih besar) */
+        .ifp-nav-btn {
+            font-size: 1.2rem;
+            padding: 1rem 1.5rem;
+            border-radius: 15px;
+        }
+    </style>
+</head>
+<body class="text-gray-800">
+
+    <!-- Tombol Fullscreen -->
+    <button onclick="toggleFullScreen()" class="fixed top-4 right-4 z-50 bg-white p-3 rounded-full shadow-lg hover:bg-gray-100 transition duration-300">
+        <i id="fullscreen-icon" class="fas fa-expand text-xl text-gray-700"></i>
+    </button>
+
+    <!-- Modal Peringatan Custom (Pengganti Alert) -->
+    <div id="custom-alert" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center hidden">
+        <div class="bg-white p-8 rounded-2xl shadow-2xl max-w-sm w-full text-center transform transition-all">
+            <div id="alert-icon" class="text-4xl mb-4 text-blue-500"><i class="fas fa-info-circle"></i></div>
+            <h3 id="alert-title" class="text-xl font-bold mb-2">Pemberitahuan</h3>
+            <p id="alert-message" class="text-gray-600 mb-6">Pesan di sini.</p>
+            <button onclick="closeAlert()" class="btn-primary w-full py-2 rounded-xl font-semibold">Tutup</button>
+        </div>
+    </div>
+
+    <!-- HALAMAN 1: PENGANTAR & LOGIN -->
+    <div id="page-pengantar" class="page active justify-center items-center bg-gradient-to-br from-teal-400 to-blue-500">
+        <div class="glass-panel p-10 max-w-2xl w-full text-center relative overflow-hidden">
+            <!-- Dekorasi background -->
+            <div class="absolute -top-10 -left-10 w-32 h-32 bg-yellow-300 rounded-full opacity-50 blur-2xl"></div>
+            <div class="absolute -bottom-10 -right-10 w-40 h-40 bg-teal-300 rounded-full opacity-50 blur-2xl"></div>
+            
+            <div class="relative z-10">
+                <img src="https://placehold.co/150x150/2563eb/ffffff?text=Pak+Barak" alt="Avatar Pak Barak" class="w-32 h-32 rounded-full mx-auto border-4 border-white shadow-lg mb-6 floating">
+                <h1 class="text-4xl font-bold text-gray-800 mb-2">Halo, Generasi Hebat!</h1>
+                <h2 class="text-2xl text-teal-600 font-semibold mb-6">Selamat Datang di Petualangan Geografis Indonesia</h2>
+                
+                <div class="bg-blue-50 p-6 rounded-xl mb-8 text-left border-l-4 border-blue-500 shadow-inner">
+                    <p class="text-lg text-gray-700 italic">
+                        "Saya <strong>Pak Barak Shaputra</strong>. Mari kita jelajahi kekayaan alam dan keunikan geografis negeri kita tercinta. Pahami potensinya, dan jadilah agen perubahan untuk masa depan Indonesia yang lebih baik. Semangat belajar!"
+                    </p>
+                </div>
+
+                <div class="space-y-4 max-w-md mx-auto">
+                    <div>
+                        <input type="text" id="player-name" placeholder="Masukkan Nama Lengkapmu" class="w-full px-5 py-4 rounded-xl border-2 border-gray-200 focus:border-blue-500 focus:outline-none text-lg transition shadow-sm">
+                    </div>
+                    <div>
+                        <input type="text" id="player-school" placeholder="Asal Sekolah" class="w-full px-5 py-4 rounded-xl border-2 border-gray-200 focus:border-blue-500 focus:outline-none text-lg transition shadow-sm">
+                    </div>
+                    <button onclick="mulaiAplikasi()" class="btn-primary w-full py-4 rounded-xl text-xl font-bold shadow-lg mt-4 flex items-center justify-center gap-2">
+                        <span>Mulai Petualangan</span>
+                        <i class="fas fa-rocket"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- NAVBAR UTAMA (Disembunyikan di awal) -->
+    <nav id="main-nav" class="hidden fixed top-0 w-full z-40 bg-white shadow-md p-4 px-8 flex justify-between items-center">
+        <div class="flex items-center gap-3">
+            <div class="bg-teal-500 text-white p-2 rounded-lg">
+                <i class="fas fa-map-marked-alt text-2xl"></i>
+            </div>
+            <div>
+                <h2 class="font-bold text-xl text-gray-800 leading-tight">Geografi Nusantara</h2>
+                <p class="text-xs text-gray-500" id="display-player-info">Pemain</p>
+            </div>
+        </div>
+        <div class="flex gap-2">
+            <button onclick="navigateTo('page-tujuan')" class="ifp-nav-btn hover:bg-teal-50 text-teal-700 font-semibold transition"><i class="fas fa-bullseye mr-2"></i> Tujuan & Panduan</button>
+            <button onclick="navigateTo('page-materi')" class="ifp-nav-btn hover:bg-blue-50 text-blue-700 font-semibold transition"><i class="fas fa-book-open mr-2"></i> Materi</button>
+            <button onclick="navigateTo('page-petualangan')" class="ifp-nav-btn bg-yellow-400 hover:bg-yellow-500 text-yellow-900 font-bold transition shadow-sm"><i class="fas fa-gamepad mr-2"></i> Petualangan</button>
+            <button onclick="navigateTo('page-asesmen')" class="ifp-nav-btn hover:bg-purple-50 text-purple-700 font-semibold transition"><i class="fas fa-tasks mr-2"></i> Proyek</button>
+        </div>
+    </nav>
+
+    <!-- Jarak untuk navbar -->
+    <div id="nav-spacer" class="hidden h-24"></div>
+
+    <!-- HALAMAN 2: TUJUAN PEMBELAJARAN & PANDUAN -->
+    <div id="page-tujuan" class="page bg-gray-50 pt-28">
+        <div class="max-w-6xl mx-auto w-full grid grid-cols-1 md:grid-cols-2 gap-8">
+            <!-- Tujuan Pembelajaran -->
+            <div class="glass-panel p-8">
+                <div class="flex items-center gap-4 mb-6 border-b pb-4">
+                    <div class="bg-blue-100 p-3 rounded-full text-blue-600">
+                        <i class="fas fa-bullseye text-3xl"></i>
+                    </div>
+                    <h2 class="text-3xl font-bold text-gray-800">Tujuan Pembelajaran</h2>
+                </div>
+                <div class="space-y-4">
+                    <div class="bg-white p-5 rounded-xl border border-gray-100 shadow-sm flex items-start gap-4">
+                        <div class="bg-teal-500 text-white w-8 h-8 rounded-full flex items-center justify-center font-bold flex-shrink-0 mt-1">1</div>
+                        <p class="text-lg text-gray-700">Memahami <strong>keberagaman kondisi geografis Indonesia</strong> secara komprehensif.</p>
+                    </div>
+                    <div class="bg-white p-5 rounded-xl border border-gray-100 shadow-sm flex items-start gap-4">
+                        <div class="bg-teal-500 text-white w-8 h-8 rounded-full flex items-center justify-center font-bold flex-shrink-0 mt-1">2</div>
+                        <p class="text-lg text-gray-700">Menganalisis <strong>konektivitas antar ruang</strong> di Indonesia.</p>
+                    </div>
+                    <div class="bg-white p-5 rounded-xl border border-gray-100 shadow-sm flex items-start gap-4">
+                        <div class="bg-teal-500 text-white w-8 h-8 rounded-full flex items-center justify-center font-bold flex-shrink-0 mt-1">3</div>
+                        <p class="text-lg text-gray-700">Menghubungkan kondisi geografis dengan <strong>pemanfaatan potensi sumber daya alam</strong> untuk kesejahteraan.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Panduan Penggunaan -->
+            <div class="glass-panel p-8">
+                <div class="flex items-center gap-4 mb-6 border-b pb-4">
+                    <div class="bg-yellow-100 p-3 rounded-full text-yellow-600">
+                        <i class="fas fa-info-circle text-3xl"></i>
+                    </div>
+                    <h2 class="text-3xl font-bold text-gray-800">Panduan Penggunaan</h2>
+                </div>
+                <ul class="space-y-6">
+                    <li class="flex items-start gap-4">
+                        <i class="fas fa-book text-2xl text-blue-500 mt-1 w-8 text-center"></i>
+                        <div>
+                            <h4 class="text-xl font-bold text-gray-800">1. Pelajari Materi</h4>
+                            <p class="text-gray-600 text-lg">Buka menu <strong>Materi</strong> untuk membaca rangkuman tentang geografis Indonesia.</p>
+                        </div>
+                    </li>
+                    <li class="flex items-start gap-4">
+                        <i class="fas fa-gamepad text-2xl text-green-500 mt-1 w-8 text-center"></i>
+                        <div>
+                            <h4 class="text-xl font-bold text-gray-800">2. Selesaikan Misi</h4>
+                            <p class="text-gray-600 text-lg">Masuk ke menu <strong>Petualangan</strong>. Selesaikan 3 Level berurutan (Bumi, Air, Udara). Tiap level punya 3 tantangan (Mudah, Sedang, Sulit).</p>
+                        </div>
+                    </li>
+                    <li class="flex items-start gap-4">
+                        <i class="fas fa-medal text-2xl text-yellow-500 mt-1 w-8 text-center"></i>
+                        <div>
+                            <h4 class="text-xl font-bold text-gray-800">3. Kerjakan Proyek</h4>
+                            <p class="text-gray-600 text-lg">Setelah paham, buka menu <strong>Proyek</strong> untuk mengerjakan tugas akhir dari Pak Barak.</p>
+                        </div>
+                    </li>
+                    <li class="flex items-start gap-4">
+                        <i class="fas fa-expand text-2xl text-gray-500 mt-1 w-8 text-center"></i>
+                        <div>
+                            <h4 class="text-xl font-bold text-gray-800">4. Gunakan Layar Penuh</h4>
+                            <p class="text-gray-600 text-lg">Gunakan tombol fullscreen di pojok kanan atas untuk pengalaman terbaik di Interactive Flat Panel.</p>
+                        </div>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <!-- HALAMAN 3: MATERI -->
+    <div id="page-materi" class="page bg-slate-50 pt-28 pb-10">
+        <div class="max-w-5xl mx-auto w-full">
+            <h2 class="text-4xl font-bold text-center mb-10 text-gray-800 border-b-4 border-blue-500 pb-4 inline-block mx-auto">Rangkuman Geografis Indonesia</h2>
+            
+            <div class="grid grid-cols-1 gap-8">
+                <!-- Letak dan Luas -->
+                <div class="bg-white rounded-2xl shadow-lg p-8 flex flex-col md:flex-row gap-8 items-center border-l-8 border-teal-500">
+                    <div class="w-full md:w-1/3 flex justify-center">
+                        <div class="w-48 h-48 bg-teal-100 rounded-full flex items-center justify-center text-teal-500 text-6xl shadow-inner">
+                            <i class="fas fa-globe-asia"></i>
+                        </div>
+                    </div>
+                    <div class="w-full md:w-2/3">
+                        <h3 class="text-2xl font-bold mb-4 text-gray-800">Letak Geografis & Astronomis</h3>
+                        <p class="text-lg text-gray-700 leading-relaxed mb-4">
+                            Secara astronomis, Indonesia terletak di <strong>6° LU - 11° LS dan 95° BT - 141° BT</strong>. Posisi ini membuat Indonesia beriklim tropis.
+                        </p>
+                        <p class="text-lg text-gray-700 leading-relaxed">
+                            Secara geografis, Indonesia berada di posisi silang yang strategis, diapit oleh dua benua (<strong>Asia dan Australia</strong>) dan dua samudra (<strong>Hindia dan Pasifik</strong>). Posisi ini menjadikan Indonesia sebagai jalur perdagangan internasional.
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Kondisi Geologis -->
+                <div class="bg-white rounded-2xl shadow-lg p-8 flex flex-col md:flex-row-reverse gap-8 items-center border-l-8 border-orange-500">
+                    <div class="w-full md:w-1/3 flex justify-center">
+                        <div class="w-48 h-48 bg-orange-100 rounded-full flex items-center justify-center text-orange-500 text-6xl shadow-inner">
+                            <i class="fas fa-mountain"></i>
+                        </div>
+                    </div>
+                    <div class="w-full md:w-2/3">
+                        <h3 class="text-2xl font-bold mb-4 text-gray-800">Kondisi Geologis & SDA</h3>
+                        <p class="text-lg text-gray-700 leading-relaxed mb-4">
+                            Indonesia berada di titik pertemuan tiga lempeng tektonik utama: Lempeng Eurasia, Lempeng Indo-Australia, dan Lempeng Pasifik. 
+                        </p>
+                        <p class="text-lg text-gray-700 leading-relaxed">
+                            <strong>Dampaknya:</strong> Banyak gunung berapi (Cincin Api Pasifik) yang membuat tanah sangat subur, namun rawan gempa. Kondisi ini juga menghasilkan kekayaan barang tambang (mineral, minyak bumi, batu bara) yang melimpah.
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Konektivitas Antar Ruang -->
+                <div class="bg-white rounded-2xl shadow-lg p-8 flex flex-col md:flex-row gap-8 items-center border-l-8 border-blue-500">
+                    <div class="w-full md:w-1/3 flex justify-center">
+                        <div class="w-48 h-48 bg-blue-100 rounded-full flex items-center justify-center text-blue-500 text-6xl shadow-inner">
+                            <i class="fas fa-ship"></i>
+                        </div>
+                    </div>
+                    <div class="w-full md:w-2/3">
+                        <h3 class="text-2xl font-bold mb-4 text-gray-800">Konektivitas Antar Ruang</h3>
+                        <p class="text-lg text-gray-700 leading-relaxed mb-4">
+                            Setiap wilayah di Indonesia memiliki karakteristik dan potensi SDA yang berbeda. Perbedaan ini menciptakan kebutuhan untuk saling melengkapi.
+                        </p>
+                        <p class="text-lg text-gray-700 leading-relaxed">
+                            <strong>Contoh:</strong> Daerah pegunungan menghasilkan sayuran, sedangkan daerah pesisir menghasilkan ikan. Keduanya saling membutuhkan melalui perdagangan. Konektivitas (transportasi dan komunikasi) sangat penting untuk mendistribusikan pemanfaatan SDA secara merata.
+                        </p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="mt-12 text-center">
+                <button onclick="navigateTo('page-petualangan')" class="btn-primary px-8 py-4 rounded-xl text-xl font-bold shadow-lg animate-pulse">
+                    Mulai Petualangan Sekarang! <i class="fas fa-arrow-right ml-2"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- HALAMAN 4: PETUALANGAN (DASHBOARD) -->
+    <div id="page-petualangan" class="page bg-gray-100 pt-28 pb-10">
+        <div class="max-w-6xl mx-auto w-full">
+            
+            <!-- Header Progress -->
+            <div class="bg-white rounded-2xl shadow-md p-6 mb-8 flex flex-col md:flex-row justify-between items-center">
+                <div>
+                    <h2 class="text-3xl font-bold text-gray-800 mb-2">Misi Penjelajahan Nusantara</h2>
+                    <p class="text-gray-600">Selesaikan semua tantangan untuk mendapatkan gelar "Ahli Geografi Muda"</p>
+                </div>
+                <div class="mt-4 md:mt-0 bg-blue-50 p-4 rounded-xl text-center min-w-[200px]">
+                    <p class="text-sm text-gray-500 font-semibold mb-1">Total Progres</p>
+                    <div class="text-3xl font-bold text-blue-600" id="total-progress-text">0%</div>
+                    <div class="w-full bg-gray-200 rounded-full h-2.5 mt-2">
+                        <div id="total-progress-bar" class="bg-blue-600 h-2.5 rounded-full transition-all duration-500" style="width: 0%"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Level Cards -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+                
+                <!-- LEVEL 1 -->
+                <div id="card-level-1" class="level-card bg-white rounded-2xl shadow-lg overflow-hidden border-t-8 border-green-500 cursor-pointer" onclick="openLevel(1)">
+                    <div class="p-6">
+                        <div class="flex justify-between items-start mb-4">
+                            <div class="bg-green-100 text-green-600 p-3 rounded-xl">
+                                <i class="fas fa-leaf text-3xl"></i>
+                            </div>
+                            <span class="bg-green-100 text-green-800 text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wide">Level 1</span>
+                        </div>
+                        <h3 class="text-2xl font-bold text-gray-800 mb-2">Potensi Daratan</h3>
+                        <p class="text-gray-600 mb-6 h-16">Uji pemahamanmu tentang kondisi geologis dan letak astronomis.</p>
+                        
+                        <div class="space-y-3">
+                            <div class="flex justify-between text-sm">
+                                <span>Mudah</span>
+                                <i id="status-l1-1" class="fas fa-circle text-gray-300"></i>
+                            </div>
+                            <div class="flex justify-between text-sm">
+                                <span>Sedang</span>
+                                <i id="status-l1-2" class="fas fa-circle text-gray-300"></i>
+                            </div>
+                            <div class="flex justify-between text-sm">
+                                <span>Sulit</span>
+                                <i id="status-l1-3" class="fas fa-circle text-gray-300"></i>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="bg-gray-50 p-4 text-center border-t border-gray-100">
+                        <span class="text-green-600 font-bold">Mulai Level <i class="fas fa-chevron-right ml-1"></i></span>
+                    </div>
+                </div>
+
+                <!-- LEVEL 2 -->
+                <div id="card-level-2" class="level-card locked bg-white rounded-2xl shadow-lg overflow-hidden border-t-8 border-blue-500 cursor-pointer" onclick="openLevel(2)">
+                    <div class="p-6 relative">
+                        <!-- Overlay Gembok -->
+                        <div id="lock-overlay-2" class="absolute inset-0 bg-white/80 flex items-center justify-center z-10">
+                            <div class="text-center">
+                                <i class="fas fa-lock text-5xl text-gray-400 mb-2"></i>
+                                <p class="text-gray-600 font-bold">Selesaikan Level 1</p>
+                            </div>
+                        </div>
+
+                        <div class="flex justify-between items-start mb-4">
+                            <div class="bg-blue-100 text-blue-600 p-3 rounded-xl">
+                                <i class="fas fa-water text-3xl"></i>
+                            </div>
+                            <span class="bg-blue-100 text-blue-800 text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wide">Level 2</span>
+                        </div>
+                        <h3 class="text-2xl font-bold text-gray-800 mb-2">Kekayaan Bahari</h3>
+                        <p class="text-gray-600 mb-6 h-16">Analisis potensi posisi silang Indonesia dan SDA kelautan.</p>
+                        
+                        <div class="space-y-3">
+                            <div class="flex justify-between text-sm">
+                                <span>Mudah</span>
+                                <i id="status-l2-1" class="fas fa-circle text-gray-300"></i>
+                            </div>
+                            <div class="flex justify-between text-sm">
+                                <span>Sedang</span>
+                                <i id="status-l2-2" class="fas fa-circle text-gray-300"></i>
+                            </div>
+                            <div class="flex justify-between text-sm">
+                                <span>Sulit</span>
+                                <i id="status-l2-3" class="fas fa-circle text-gray-300"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- LEVEL 3 -->
+                <div id="card-level-3" class="level-card locked bg-white rounded-2xl shadow-lg overflow-hidden border-t-8 border-purple-500 cursor-pointer" onclick="openLevel(3)">
+                    <div class="p-6 relative">
+                         <!-- Overlay Gembok -->
+                         <div id="lock-overlay-3" class="absolute inset-0 bg-white/80 flex items-center justify-center z-10">
+                            <div class="text-center">
+                                <i class="fas fa-lock text-5xl text-gray-400 mb-2"></i>
+                                <p class="text-gray-600 font-bold">Selesaikan Level 2</p>
+                            </div>
+                        </div>
+
+                        <div class="flex justify-between items-start mb-4">
+                            <div class="bg-purple-100 text-purple-600 p-3 rounded-xl">
+                                <i class="fas fa-network-wired text-3xl"></i>
+                            </div>
+                            <span class="bg-purple-100 text-purple-800 text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wide">Level 3</span>
+                        </div>
+                        <h3 class="text-2xl font-bold text-gray-800 mb-2">Konektivitas Ruang</h3>
+                        <p class="text-gray-600 mb-6 h-16">Pecahkan masalah distribusi sumber daya antar wilayah.</p>
+                        
+                        <div class="space-y-3">
+                            <div class="flex justify-between text-sm">
+                                <span>Mudah</span>
+                                <i id="status-l3-1" class="fas fa-circle text-gray-300"></i>
+                            </div>
+                            <div class="flex justify-between text-sm">
+                                <span>Sedang</span>
+                                <i id="status-l3-2" class="fas fa-circle text-gray-300"></i>
+                            </div>
+                            <div class="flex justify-between text-sm">
+                                <span>Sulit</span>
+                                <i id="status-l3-3" class="fas fa-circle text-gray-300"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <!-- HALAMAN GAME (SOAL) -->
+    <div id="page-game" class="page bg-gray-900 pt-28 pb-10">
+        <div class="max-w-4xl mx-auto w-full">
+            <button onclick="navigateTo('page-petualangan')" class="text-gray-300 hover:text-white mb-6 font-semibold flex items-center">
+                <i class="fas fa-arrow-left mr-2"></i> Kembali ke Peta Petualangan
+            </button>
+
+            <div class="bg-white rounded-2xl shadow-2xl overflow-hidden">
+                <!-- Game Header -->
+                <div id="game-header" class="p-6 text-white text-center">
+                    <h2 id="game-level-title" class="text-2xl font-bold opacity-80 uppercase tracking-widest text-sm mb-1">Level 1</h2>
+                    <h3 id="game-challenge-title" class="text-3xl font-bold">Tantangan Sedang</h3>
+                </div>
+
+                <!-- Game Content -->
+                <div class="p-8">
+                    <!-- Skenario Cerita HOTS -->
+                    <div class="bg-blue-50 border-l-4 border-blue-500 p-6 rounded-r-xl mb-8">
+                        <p id="game-scenario" class="text-lg text-gray-800 leading-relaxed font-medium">
+                            Memuat skenario...
+                        </p>
+                    </div>
+
+                    <!-- Pertanyaan Uraian -->
+                    <h4 class="font-bold text-xl mb-4 text-gray-800"><i class="fas fa-question-circle text-blue-500 mr-2"></i>Pertanyaan:</h4>
+                    <p id="game-question" class="text-lg text-gray-700 mb-6 font-semibold">
+                        Memuat pertanyaan...
+                    </p>
+
+                    <!-- Textarea Jawaban -->
+                    <textarea id="player-answer" rows="5" class="w-full p-4 border-2 border-gray-300 rounded-xl focus:border-blue-500 focus:outline-none text-lg resize-none mb-6" placeholder="Ketik jawaban analisismu di sini..."></textarea>
+
+                    <button onclick="submitAnswer()" class="btn-primary w-full py-4 rounded-xl text-xl font-bold shadow-lg flex justify-center items-center gap-2">
+                        <span>Kirim Jawaban</span> <i class="fas fa-paper-plane"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- HALAMAN 5: ASESMEN SUMATIF (PROYEK) -->
+    <div id="page-asesmen" class="page bg-slate-50 pt-28 pb-10">
+        <div class="max-w-5xl mx-auto w-full">
+            <div class="bg-white rounded-2xl shadow-xl overflow-hidden border-2 border-yellow-400">
+                <div class="bg-yellow-400 p-6 text-center">
+                    <i class="fas fa-trophy text-5xl text-yellow-800 mb-4"></i>
+                    <h2 class="text-3xl font-bold text-yellow-900">Tugas Akhir: Proyek Agen Perubahan</h2>
+                </div>
+                
+                <div class="p-8 md:p-12">
+                    <div class="flex flex-col md:flex-row gap-8 items-start">
+                        <div class="md:w-1/3">
+                            <img src="https://placehold.co/300x300/2563eb/ffffff?text=Proyek+Akhir" alt="Ilustrasi Proyek" class="w-full rounded-xl shadow-md mb-4">
+                            <div class="bg-red-50 border-l-4 border-red-500 p-4 rounded text-red-700">
+                                <p class="font-bold"><i class="fas fa-exclamation-triangle mr-2"></i>Syarat:</p>
+                                <p class="text-sm">Kerjakan setelah menyelesaikan semua Level Petualangan.</p>
+                            </div>
+                        </div>
+                        <div class="md:w-2/3">
+                            <h3 class="text-2xl font-bold text-gray-800 mb-4">Rancang Rute Logistik Nusantara</h3>
+                            
+                            <div class="prose max-w-none text-gray-700">
+                                <p class="mb-4"><strong>Konteks:</strong> Bayangkan kamu adalah Menteri Perdagangan. Terdapat masalah kelangkaan bahan pokok (Beras dari Jawa, Bawang dari Brebes) di wilayah kepulauan Maluku, sementara Maluku memiliki surplus hasil tangkapan laut yang dibutuhkan di Pulau Jawa.</p>
+                                
+                                <p class="font-bold mb-2">Tugas Praktik Kelompok (3-4 Orang):</p>
+                                <ol class="list-decimal pl-5 mb-6 space-y-2">
+                                    <li>Buatlah <strong>Peta Konsep / Mind Map</strong> di kertas karton besar (atau menggunakan aplikasi di IFP).</li>
+                                    <li>Gambarkan rute distribusi barang yang paling efisien dengan mempertimbangkan kondisi geografis (lautan, cuaca, infrastruktur pelabuhan).</li>
+                                    <li>Sebutkan potensi hambatan geografis yang mungkin terjadi di rute tersebut dan bagaimana solusi konektivitasnya.</li>
+                                    <li>Presentasikan hasil diskusi kelompokmu di depan kelas menggunakan layar panel interaktif!</li>
+                                </ol>
+                                
+                                <div class="bg-gray-100 p-4 rounded-lg">
+                                    <h4 class="font-bold text-gray-800 mb-2">Kriteria Penilaian:</h4>
+                                    <ul class="list-disc pl-5 text-sm space-y-1">
+                                        <li>Kesesuaian solusi dengan kondisi geografis (30%)</li>
+                                        <li>Kreativitas dan kelengkapan Peta Konsep (30%)</li>
+                                        <li>Kejelasan pemaparan konektivitas antar ruang (20%)</li>
+                                        <li>Kerjasama tim dan kualitas presentasi (20%)</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+
+    <script>
+        // --- DATA DAN STATE GAME ---
+        let playerData = {
+            name: "",
+            school: "",
+            progress: {
+                level1: [false, false, false], // mudah, sedang, sulit
+                level2: [false, false, false],
+                level3: [false, false, false]
+            }
+        };
+
+        let currentActiveLevel = 1;
+        let currentActiveDifficulty = 1;
+
+        // Bank Soal HOTS (Cerita dan Uraian)
+        const bankSoal = {
+            1: { // Level 1: Daratan
+                color: 'bg-green-600',
+                title: 'Potensi Daratan',
+                1: { // Mudah
+                    scenario: "Sebuah desa di lereng Gunung Merapi, Jawa Tengah, berencana membuka lahan pertanian baru. Kepala desa menyadari bahwa tanah di wilayahnya sangat subur karena sejarah letusan gunung.",
+                    question: "Berdasarkan kondisi geologis Indonesia, jelaskan mengapa tanah di sekitar gunung berapi cenderung subur dan cocok untuk pertanian!",
+                    minWords: 5
+                },
+                2: { // Sedang
+                    scenario: "Budi tinggal di Pontianak, Kalimantan Barat, yang dilalui garis khatulistiwa. Suatu hari ia berkomunikasi dengan temannya di London, Inggris. Ia menyadari perbedaan mencolok tentang durasi siang-malam dan iklim.",
+                    question: "Analisislah pengaruh letak astronomis Indonesia terhadap iklim yang dirasakan Budi di Pontianak dibandingkan dengan negara-negara di benua Eropa!",
+                    minWords: 10
+                },
+                3: { // Sulit
+                    scenario: "Pemerintah berencana memindahkan ibu kota ke Pulau Kalimantan. Salah satu alasan utamanya terkait mitigasi bencana alam jangka panjang. Kalimantan diketahui relatif lebih aman dibanding Jawa atau Sumatra.",
+                    question: "Kaitkan kondisi letak geologis tektonik Indonesia dengan minimnya risiko gempa bumi dan gunung meletus di Pulau Kalimantan. Berikan analisis kritis mengapa hal ini menjadi pertimbangan utama!",
+                    minWords: 15
+                }
+            },
+            2: { // Level 2: Bahari
+                color: 'bg-blue-600',
+                title: 'Kekayaan Bahari',
+                1: { // Mudah
+                    scenario: "Nelayan tradisional di pesisir Utara Jawa mengalami kesulitan menangkap ikan saat musim angin muson barat yang membawa banyak hujan dan gelombang tinggi.",
+                    question: "Jelaskan apa yang dimaksud dengan angin muson dan bagaimana dampaknya terhadap aktivitas pemanfaatan sumber daya alam laut di Indonesia!",
+                    minWords: 5
+                },
+                2: { // Sedang
+                    scenario: "Kapal kargo besar dari Tiongkok menuju Eropa sering kali melewati Selat Malaka. Pemerintah Indonesia melihat potensi besar untuk membangun pelabuhan transit di wilayah sekitar Sumatra bagian timur atau Kepulauan Riau.",
+                    question: "Berdasarkan letak geografis (posisi silang), analisislah keuntungan ekonomi yang bisa diperoleh Indonesia jika berhasil mengoptimalkan jalur pelayaran internasional tersebut!",
+                    minWords: 10
+                },
+                3: { // Sulit
+                    scenario: "Eksploitasi tambang nikel di suatu pulau kecil Indonesia Timur berdampak buruk pada terumbu karang di sekitar pesisir karena limbah tailing yang terbawa arus laut.",
+                    question: "Evaluasilah konflik kepentingan antara pemanfaatan sumber daya geologis (tambang) dan sumber daya hayati laut (terumbu karang). Apa solusi tata ruang yang menurutmu paling tepat untuk menyeimbangkan keduanya?",
+                    minWords: 15
+                }
+            },
+            3: { // Level 3: Konektivitas
+                color: 'bg-purple-600',
+                title: 'Konektivitas Ruang',
+                1: { // Mudah
+                    scenario: "Harga semen di Pulau Jawa berkisar Rp 50.000/saki. Namun, di daerah pegunungan pedalaman Papua, harga semen yang sama bisa mencapai Rp 500.000/sak.",
+                    question: "Faktor kondisi geografis apa yang paling menyebabkan ketimpangan harga tersebut? Jelaskan!",
+                    minWords: 5
+                },
+                2: { // Sedang
+                    scenario: "Pemerintah membangun program 'Tol Laut' dengan mensubsidi rute kapal laut barang yang rutin berlayar dari barat ke timur Indonesia, melewati pelabuhan-pelabuhan kecil yang selama ini terisolir.",
+                    question: "Analisislah bagaimana program Tol Laut dapat menyelesaikan masalah konektivitas antar ruang dan berdampak pada pemerataan ekonomi wilayah timur Indonesia!",
+                    minWords: 10
+                },
+                3: { // Sulit
+                    scenario: "Provinsi A memiliki surplus produk pertanian pangan, sedangkan Provinsi B, yang berupa kepulauan karang, sangat bergantung pada impor pangan dari luar namun memiliki keunggulan pariwisata yang mendatangkan banyak devisa.",
+                    question: "Rancanglah sebuah konsep 'Simbiosis Regional' (saling ketergantungan menguntungkan) antara Provinsi A dan Provinsi B. Bagaimana infrastruktur konektivitas harus dibangun untuk mendukung konsep tersebut secara berkelanjutan?",
+                    minWords: 15
+                }
+            }
+        };
+
+        // --- FUNGSI NAVIGASI & UI ---
+        function toggleFullScreen() {
+            if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen().catch(err => {
+                    showAlert(`Gagal mengaktifkan mode fullscreen: ${err.message}`);
+                });
+                document.getElementById('fullscreen-icon').classList.replace('fa-expand', 'fa-compress');
+            } else {
+                if (document.exitFullscreen) {
+                    document.exitFullscreen();
+                    document.getElementById('fullscreen-icon').classList.replace('fa-compress', 'fa-expand');
+                }
+            }
+        }
+
+        function showAlert(message, title = "Pemberitahuan", icon = "fa-info-circle", colorClass = "text-blue-500") {
+            document.getElementById('alert-title').innerText = title;
+            document.getElementById('alert-message').innerText = message;
+            
+            const iconDiv = document.getElementById('alert-icon');
+            iconDiv.className = `text-4xl mb-4 ${colorClass}`;
+            iconDiv.innerHTML = `<i class="fas ${icon}"></i>`;
+            
+            document.getElementById('custom-alert').classList.remove('hidden');
+        }
+
+        function closeAlert() {
+            document.getElementById('custom-alert').classList.add('hidden');
+        }
+
+        function navigateTo(pageId) {
+            // Sembunyikan semua halaman
+            document.querySelectorAll('.page').forEach(page => {
+                page.classList.remove('active');
+            });
+            
+            // Tampilkan halaman yang dituju
+            const targetPage = document.getElementById(pageId);
+            if(targetPage) {
+                targetPage.classList.add('active');
+                window.scrollTo(0,0);
+            }
+
+            // Jika masuk ke halaman selain pengantar, pastikan navbar muncul
+            if (pageId !== 'page-pengantar') {
+                document.getElementById('main-nav').classList.remove('hidden');
+                document.getElementById('nav-spacer').classList.remove('hidden');
+            }
+            
+            if (pageId === 'page-petualangan') {
+                updateDashboardUI();
+            }
+        }
+
+        function mulaiAplikasi() {
+            const name = document.getElementById('player-name').value.trim();
+            const school = document.getElementById('player-school').value.trim();
+
+            if (name === "" || school === "") {
+                showAlert("Harap isi Nama dan Asal Sekolah terlebih dahulu agar Pak Barak bisa mengenalmu!", "Isi Data Dirimu", "fa-exclamation-circle", "text-yellow-500");
+                return;
+            }
+
+            playerData.name = name;
+            playerData.school = school;
+            
+            document.getElementById('display-player-info').innerText = `${name} | ${school}`;
+            
+            // Langsung arahkan ke Tujuan Pembelajaran
+            navigateTo('page-tujuan');
+            showAlert(`Selamat datang, ${name}!\n\nMari mulai dengan membaca Tujuan Pembelajaran dan Panduan.`, "Berhasil Masuk", "fa-check-circle", "text-green-500");
+        }
+
+        // --- LOGIKA GAME ---
+        function updateDashboardUI() {
+            // Hitung Progres
+            let completed = 0;
+            const total = 9; // 3 level * 3 tantangan
+            
+            for (let i = 1; i <= 3; i++) {
+                let levelCompletedCount = 0;
+                for (let j = 0; j < 3; j++) {
+                    // Update icon status
+                    const iconId = `status-l${i}-${j+1}`;
+                    const iconEl = document.getElementById(iconId);
+                    
+                    if (playerData.progress[`level${i}`][j]) {
+                        iconEl.className = "fas fa-check-circle text-green-500";
+                        completed++;
+                        levelCompletedCount++;
+                    } else {
+                        iconEl.className = "fas fa-circle text-gray-300";
+                    }
+                }
+            }
+
+            // Update Progress Bar
+            const percentage = Math.round((completed / total) * 100);
+            document.getElementById('total-progress-text').innerText = `${percentage}%`;
+            document.getElementById('total-progress-bar').style.width = `${percentage}%`;
+
+            // Buka Kunci Level (Level 2 buka jika L1 selesai, L3 buka jika L2 selesai)
+            const isL1Done = playerData.progress.level1.every(val => val === true);
+            const isL2Done = playerData.progress.level2.every(val => val === true);
+
+            // Handle UI Kunci Level 2
+            const cardL2 = document.getElementById('card-level-2');
+            const lockL2 = document.getElementById('lock-overlay-2');
+            if (isL1Done) {
+                cardL2.classList.remove('locked');
+                if(lockL2) lockL2.style.display = 'none';
+            } else {
+                cardL2.classList.add('locked');
+                if(lockL2) lockL2.style.display = 'flex';
+            }
+
+            // Handle UI Kunci Level 3
+            const cardL3 = document.getElementById('card-level-3');
+            const lockL3 = document.getElementById('lock-overlay-3');
+            if (isL2Done) {
+                cardL3.classList.remove('locked');
+                if(lockL3) lockL3.style.display = 'none';
+            } else {
+                cardL3.classList.add('locked');
+                if(lockL3) lockL3.style.display = 'flex';
+            }
+        }
+
+        function openLevel(levelNum) {
+            // Pengecekan apakah level terkunci
+            if (levelNum === 2 && !playerData.progress.level1.every(v => v === true)) {
+                showAlert("Kamu harus menyelesaikan semua tantangan di Level 1 terlebih dahulu!", "Level Terkunci", "fa-lock", "text-red-500");
+                return;
+            }
+            if (levelNum === 3 && !playerData.progress.level2.every(v => v === true)) {
+                showAlert("Kamu harus menyelesaikan semua tantangan di Level 2 terlebih dahulu!", "Level Terkunci", "fa-lock", "text-red-500");
+                return;
+            }
+
+            // Cari tantangan pertama yang belum selesai di level ini
+            let diffToPlay = 1;
+            for (let j = 0; j < 3; j++) {
+                if (!playerData.progress[`level${levelNum}`][j]) {
+                    diffToPlay = j + 1;
+                    break;
+                }
+            }
+            
+            // Jika semua sudah selesai, ulangi yang sulit
+            if (diffToPlay > 3) diffToPlay = 3;
+
+            startChallenge(levelNum, diffToPlay);
+        }
+
+        function startChallenge(level, difficulty) {
+            currentActiveLevel = level;
+            currentActiveDifficulty = difficulty;
+            
+            const diffName = ["Mudah", "Sedang", "Sulit"][difficulty - 1];
+            const dataSoal = bankSoal[level];
+            const soalDetail = dataSoal[difficulty];
+
+            // Set UI Game
+            const header = document.getElementById('game-header');
+            header.className = `p-6 text-white text-center ${dataSoal.color}`;
+            
+            document.getElementById('game-level-title').innerText = `LEVEL ${level} : ${dataSoal.title}`;
+            document.getElementById('game-challenge-title').innerText = `Tantangan ${diffName}`;
+            
+            document.getElementById('game-scenario').innerText = soalDetail.scenario;
+            document.getElementById('game-question').innerText = soalDetail.question;
+            
+            // Reset textarea
+            document.getElementById('player-answer').value = "";
+
+            // Jika sudah pernah dijawab, beri info
+            if (playerData.progress[`level${level}`][difficulty - 1]) {
+                document.getElementById('player-answer').value = "(Kamu sudah menyelesaikan tantangan ini. Boleh diisi lagi untuk mengubah jawaban).";
+            }
+
+            navigateTo('page-game');
+        }
+
+        function submitAnswer() {
+            const answerText = document.getElementById('player-answer').value.trim();
+            const minWords = bankSoal[currentActiveLevel][currentActiveDifficulty].minWords;
+            const wordCount = answerText.split(/\s+/).filter(word => word.length > 0).length;
+
+            if (wordCount < minWords) {
+                showAlert(`Jawabanmu terlalu singkat. Analisis HOTS membutuhkan penjelasan mendalam. (Minimal ${minWords} kata, saat ini: ${wordCount} kata)`, "Jawaban Belum Tuntas", "fa-pencil-alt", "text-orange-500");
+                return;
+            }
+
+            // Jika lulus syarat minimal kata (Simulasi AI Grader Sederhana)
+            // Di dunia nyata, ini dikirim ke server/guru
+            
+            playerData.progress[`level${currentActiveLevel}`][currentActiveDifficulty - 1] = true;
+            
+            // Cek apakah level ini baru saja selesai semua
+            const levelDone = playerData.progress[`level${currentActiveLevel}`].every(v => v === true);
+            
+            // Cek apakah game tamat
+            const l1 = playerData.progress.level1.every(v => v === true);
+            const l2 = playerData.progress.level2.every(v => v === true);
+            const l3 = playerData.progress.level3.every(v => v === true);
+            const gameTamat = l1 && l2 && l3;
+
+            if (gameTamat) {
+                showAlert("LUAR BIASA! Kamu telah menyelesaikan semua level penjelajahan. Sekarang buka menu PROYEK untuk melihat tugas akhir dari Pak Barak.", "Pencapaian Tertinggi!", "fa-trophy", "text-yellow-500");
+                navigateTo('page-petualangan'); // Update UI
+            } else if (levelDone) {
+                showAlert(`Selamat! Kamu berhasil menyelesaikan Level ${currentActiveLevel}. Level berikutnya telah terbuka!`, "Level Diselesaikan", "fa-star", "text-green-500");
+                navigateTo('page-petualangan'); // Kembali ke peta untuk lihat yang baru buka
+            } else {
+                showAlert(`Jawaban analitismu diterima! Mari lanjut ke tantangan berikutnya.`, "Kerja Bagus!", "fa-thumbs-up", "text-blue-500");
+                // Lanjut ke tingkat berikutnya di level yang sama
+                startChallenge(currentActiveLevel, currentActiveDifficulty + 1);
+            }
+        }
+        
+        // Inisialisasi awal saat load
+        window.onload = function() {
+            // Tampilkan halaman pertama
+            navigateTo('page-pengantar');
+            document.getElementById('main-nav').classList.add('hidden');
+            document.getElementById('nav-spacer').classList.add('hidden');
+        }
+    </script>
+</body>
+</html>
