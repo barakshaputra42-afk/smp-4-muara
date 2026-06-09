@@ -1,0 +1,783 @@
+import React, { useState, useEffect } from 'react';
+import { 
+  Maximize, 
+  Minimize, 
+  Play, 
+  BookOpen, 
+  Map, 
+  Target, 
+  Trophy, 
+  ChevronRight, 
+  CheckCircle, 
+  Lock, 
+  Unlock, 
+  Home, 
+  Star,
+  Award,
+  ArrowLeft,
+  Sparkles,
+  Bot,
+  Loader2
+} from 'lucide-react';
+
+// --- CUSTOM CSS FOR 3D ANIMATION & RESPONSIVE TOUCH ---
+const customStyles = `
+  .perspective-1000 {
+    perspective: 1000px;
+  }
+  .preserve-3d {
+    transform-style: preserve-3d;
+  }
+  .animate-spin-3d {
+    animation: spin3d 3s linear infinite;
+  }
+  @keyframes spin3d {
+    0% { transform: rotateY(0deg) rotateX(10deg); }
+    100% { transform: rotateY(360deg) rotateX(10deg); }
+  }
+  .glass-panel {
+    background: rgba(255, 255, 255, 0.85);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+  }
+  /* Scrollbar styling for touch panels */
+  ::-webkit-scrollbar {
+    width: 12px;
+  }
+  ::-webkit-scrollbar-track {
+    background: #f1f1f1; 
+    border-radius: 10px;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #888; 
+    border-radius: 10px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: #555; 
+  }
+`;
+
+// --- DATA KONTEN PEMBELAJARAN ---
+const materiData = {
+  title: "Kondisi Geografis Indonesia & Konektivitas Ruang",
+  content: [
+    {
+      subtitle: "1. Letak Geografis dan Pengaruhnya",
+      text: "Indonesia terletak di antara dua benua (Asia dan Australia) serta dua samudra (Hindia dan Pasifik). Kondisi ini menjadikan Indonesia berada di jalur perdagangan internasional yang strategis, menciptakan konektivitas ruang yang tinggi antar negara, dan memberikan keragaman iklim (tropis) yang sangat mendukung pertumbuhan flora dan fauna."
+    },
+    {
+      subtitle: "2. Konektivitas Antar Ruang",
+      text: "Setiap ruang di permukaan bumi memiliki karakteristik berbeda. Daerah pegunungan menghasilkan sayuran, sedangkan pesisir menghasilkan ikan. Perbedaan potensi ini memunculkan interaksi antar ruang melalui perdagangan dan transportasi untuk saling memenuhi kebutuhan masyarakat."
+    },
+    {
+      subtitle: "3. Pemanfaatan Sumber Daya Alam (SDA)",
+      text: "Kondisi iklim dan geologi (cincin api pasifik) membuat Indonesia kaya akan SDA hayati (hutan, pertanian) dan non-hayati (barang tambang, mineral). Pemanfaatan SDA harus memperhatikan prinsip pembangunan berkelanjutan agar tidak merusak ekosistem."
+    }
+  ]
+};
+
+// --- GEMINI API HELPER ---
+const callGeminiWithRetry = async (userQuery, systemPrompt, retries = 5) => {
+  const apiKey = ""; // API Key disuntikkan secara otomatis oleh environment saat runtime
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
+  
+  const payload = {
+    contents: [{ parts: [{ text: userQuery }] }],
+    systemInstruction: { parts: [{ text: systemPrompt }] }
+  };
+
+  let delay = 1000;
+  for (let i = 0; i < retries; i++) {
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+      const data = await response.json();
+      return data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+    } catch (error) {
+      if (i === retries - 1) throw error;
+      await new Promise(res => setTimeout(res, delay));
+      delay *= 2; // Exponential backoff (1s, 2s, 4s, 8s, 16s)
+    }
+  }
+};
+
+const tantanganData = {
+  level1: {
+    title: "Level 1: Zamrud Sumatera (Pertanian & Hutan)",
+    mudah: "Mengapa Pulau Sumatera sangat cocok untuk perkebunan skala besar seperti kelapa sawit dan karet? Hubungkan dengan kondisi geografisnya!",
+    sedang: "Jelaskan bagaimana pembukaan lahan hutan yang masif untuk perkebunan berdampak pada interaksi atau pergerakan fauna endemik di Sumatera!",
+    sulit: "[HOTS] Jika terjadi kebakaran hutan berskala besar di Sumatera, analisislah dampaknya terhadap konektivitas ekonomi (distribusi barang/jasa) dan hubungan diplomatik dengan negara tetangga!"
+  },
+  level2: {
+    title: "Level 2: Lumbung Jawa (Populasi & Pangan)",
+    mudah: "Jelaskan mengapa Pulau Jawa memiliki tanah yang sangat subur dibandingkan pulau lainnya di Indonesia!",
+    sedang: "Pulau Jawa sangat padat penduduk. Bagaimana fenomena ini mempengaruhi alih fungsi lahan pertanian menjadi pemukiman atau industri?",
+    sulit: "[HOTS] Pemerintah membangun Tol Trans Jawa untuk mempercepat konektivitas antar ruang. Evaluasilah dampak positif dan negatif infrastruktur ini terhadap nilai ekonomi hasil panen petani lokal di pedesaan!"
+  },
+  level3: {
+    title: "Level 3: Harta Karun Timur (Tambang & Laut)",
+    mudah: "Sebutkan 3 potensi sumber daya alam unggulan (tambang/laut) yang banyak ditemukan di wilayah Maluku dan Papua!",
+    sedang: "Mengapa konektivitas dan distribusi barang di wilayah Indonesia Timur jauh lebih menantang dan mahal dibandingkan di wilayah barat?",
+    sulit: "[HOTS] Rancanglah sebuah gagasan sistem 'Tol Laut' atau logistik terpadu yang efektif agar hasil laut dari Maluku dapat didistribusikan ke Pulau Jawa dengan kualitas tetap segar dan harga yang menguntungkan nelayan lokal!"
+  }
+};
+
+export default function App() {
+  // --- STATE MANAGEMENT ---
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [currentView, setCurrentView] = useState('home'); // home, dashboard, tujuan, materi, petualang, asesmen
+  const [user, setUser] = useState({ name: '', school: '' });
+  const [progress, setProgress] = useState({
+    level1: { mudah: false, sedang: false, sulit: false },
+    level2: { mudah: false, sedang: false, sulit: false },
+    level3: { mudah: false, sedang: false, sulit: false },
+  });
+  
+  // State for AI Feedback
+  const [feedbacks, setFeedbacks] = useState({
+    level1: {}, level2: {}, level3: {}
+  });
+  const [isLoadingAI, setIsLoadingAI] = useState(false);
+
+  // State for AI Project Brainstorming
+  const [projectRegion, setProjectRegion] = useState('');
+  const [isGeneratingProject, setIsGeneratingProject] = useState(false);
+  const [projectIdeas, setProjectIdeas] = useState('');
+
+  const [activeLevel, setActiveLevel] = useState(null); // 'level1', 'level2', 'level3'
+  const [activeChallenge, setActiveChallenge] = useState(null); // 'mudah', 'sedang', 'sulit'
+  const [answer, setAnswer] = useState('');
+  const [show3DSuccess, setShow3DSuccess] = useState(false);
+
+  // --- FULLSCREEN HANDLER ---
+  const toggleFullscreen = () => {
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen().catch((err) => {
+        console.error(`Error attempting to enable fullscreen: ${err.message}`);
+      });
+    } else {
+      document.exitFullscreen();
+    }
+  };
+
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(!!document.fullscreenElement);
+    };
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
+  }, []);
+
+  // --- PROGRESS LOGIC ---
+  const calculateProgress = () => {
+    let total = 9;
+    let completed = 0;
+    Object.values(progress).forEach(lvl => {
+      if (lvl.mudah) completed++;
+      if (lvl.sedang) completed++;
+      if (lvl.sulit) completed++;
+    });
+    return Math.round((completed / total) * 100);
+  };
+
+  const isLevelUnlocked = (levelId) => {
+    if (levelId === 'level1') return true;
+    if (levelId === 'level2') return progress.level1.mudah && progress.level1.sedang && progress.level1.sulit;
+    if (levelId === 'level3') return progress.level2.mudah && progress.level2.sedang && progress.level2.sulit;
+    return false;
+  };
+
+  const handleSubmitAnswer = async () => {
+    if (answer.trim().length < 15) {
+      alert("Jawaban terlalu singkat. Ayo analisis lebih dalam lagi! (Minimal 15 karakter)");
+      return;
+    }
+    
+    setIsLoadingAI(true);
+    const q = tantanganData[activeLevel][activeChallenge];
+    const systemPrompt = `Kamu adalah Pak Barak, seorang guru IPS SMP di Indonesia yang ramah, memotivasi, dan bijaksana. Siswa baru saja menjawab pertanyaan analisis geografi (HOTS): "${q}". Jawaban siswa: "${answer}". Berikan komentar singkat, pujian, atau saran perbaikan (maksimal 3 kalimat) dengan gaya bahasa yang menyemangati. Di akhir respons, berikan skor (Skor: X/100).`;
+
+    try {
+      const feedbackText = await callGeminiWithRetry(answer, systemPrompt);
+      
+      setFeedbacks(prev => ({
+        ...prev,
+        [activeLevel]: {
+          ...prev[activeLevel],
+          [activeChallenge]: feedbackText
+        }
+      }));
+
+      // Save progress
+      setProgress(prev => ({
+        ...prev,
+        [activeLevel]: {
+          ...prev[activeLevel],
+          [activeChallenge]: true
+        }
+      }));
+      
+      // Show 3D Success Animation
+      setShow3DSuccess(true);
+      setTimeout(() => {
+        setShow3DSuccess(false);
+        // Tetap di halaman agar siswa bisa membaca feedback dari AI Pak Barak
+      }, 4000);
+
+    } catch (error) {
+      alert("Oops, jaringan ke Pak Barak sedang terganggu. Lencana tetap diberikan, kerja bagus!");
+      setProgress(prev => ({ ...prev, [activeLevel]: { ...prev[activeLevel], [activeChallenge]: true } }));
+      setShow3DSuccess(true);
+      setTimeout(() => setShow3DSuccess(false), 4000);
+    } finally {
+      setIsLoadingAI(false);
+    }
+  };
+
+  const handleGenerateProjectIdeas = async () => {
+    if(!projectRegion.trim()) {
+      alert("Ketik nama daerah asalmu/provinsimu dulu ya!");
+      return;
+    }
+    setIsGeneratingProject(true);
+    const systemPrompt = `Kamu adalah asisten guru IPS yang sangat kreatif. Siswa ini akan membuat proyek geografi tentang daerahnya: "${projectRegion}". Berikan 3 ide potensi Sumber Daya Alam (SDA) unggulan di daerah tersebut, dan 1 ide proyek peningkatan konektivitas/distribusi (misalnya perbaikan jalan, pelabuhan, e-commerce lokal) yang bisa mereka angkat menjadi tugas sekolah. Gunakan bullet point, maksimal 100 kata, bahasa ramah anak SMP.`;
+    
+    try {
+      const ideas = await callGeminiWithRetry(`Tolong bantu saya memikirkan ide tugas akhir untuk daerah ${projectRegion}`, systemPrompt);
+      setProjectIdeas(ideas);
+    } catch (error) {
+      setProjectIdeas("Wah, koneksi ke server inspirasi sedang terputus. Coba cari referensi di perpustakaan atau internet ya!");
+    } finally {
+      setIsGeneratingProject(false);
+    }
+  };
+
+  // --- RENDER HELPERS ---
+  const Header = ({ title, showBack = true }) => (
+    <div className="flex justify-between items-center bg-blue-800 text-white p-6 shadow-md rounded-b-2xl mb-8">
+      <div className="flex items-center gap-4">
+        {showBack && (
+          <button 
+            onClick={() => setCurrentView('dashboard')}
+            className="p-3 bg-blue-700 hover:bg-blue-600 rounded-full transition-colors touch-manipulation"
+          >
+            <Home size={32} />
+          </button>
+        )}
+        <h1 className="text-4xl font-bold tracking-wide">{title}</h1>
+      </div>
+      <div className="flex items-center gap-6">
+        <div className="bg-blue-900 px-6 py-2 rounded-full text-xl font-semibold border border-blue-500 shadow-inner">
+          <span className="text-yellow-400">🏅 Progress: </span> {calculateProgress()}%
+        </div>
+        <button onClick={toggleFullscreen} className="p-3 bg-blue-700 hover:bg-blue-600 rounded-full touch-manipulation">
+          {isFullscreen ? <Minimize size={32} /> : <Maximize size={32} />}
+        </button>
+      </div>
+    </div>
+  );
+
+  // --- VIEWS ---
+  const renderHome = () => (
+    <div className="min-h-screen bg-gradient-to-br from-blue-500 via-indigo-600 to-purple-800 flex items-center justify-center p-8 relative overflow-hidden">
+      {/* Abstract Background Shapes */}
+      <div className="absolute top-[-10%] left-[-10%] w-96 h-96 bg-blue-400 rounded-full mix-blend-multiply filter blur-3xl opacity-50 animate-pulse"></div>
+      <div className="absolute bottom-[-10%] right-[-10%] w-96 h-96 bg-purple-400 rounded-full mix-blend-multiply filter blur-3xl opacity-50 animate-pulse delay-1000"></div>
+
+      <div className="glass-panel p-12 rounded-3xl shadow-2xl max-w-4xl w-full relative z-10 flex flex-col md:flex-row gap-12 items-center">
+        
+        {/* Guru / Motivator Section */}
+        <div className="w-full md:w-1/2 flex flex-col items-center text-center">
+          <div className="w-48 h-48 bg-blue-200 rounded-full border-8 border-white shadow-xl overflow-hidden mb-6 flex items-center justify-center relative perspective-1000">
+            {/* 3D Animated Avatar Placeholder */}
+            <div className="w-32 h-32 bg-blue-500 rounded-full text-white flex items-center justify-center text-6xl font-bold shadow-inner preserve-3d animate-spin-3d">
+              <span className="absolute">👨‍🏫</span>
+            </div>
+          </div>
+          <h2 className="text-3xl font-extrabold text-blue-900 mb-2">Pak Barak Shaputra</h2>
+          <p className="text-xl text-blue-700 italic font-medium leading-relaxed">
+            "Selamat datang di Penjelajahan Ruang Nusantara! Siapkan pemikiran kritismu, mari kita telusuri kekayaan geografi Indonesia dan jadilah agen perubahan masa depan!"
+          </p>
+        </div>
+
+        {/* Input Form Section */}
+        <div className="w-full md:w-1/2 bg-white/90 p-8 rounded-2xl shadow-lg border border-white">
+          <h3 className="text-3xl font-bold text-gray-800 mb-8 text-center border-b-2 border-blue-200 pb-4">
+            Mulai Petualangan
+          </h3>
+          
+          <div className="space-y-6">
+            <div>
+              <label className="block text-xl font-bold text-gray-700 mb-2">Nama Penjelajah</label>
+              <input 
+                type="text" 
+                value={user.name}
+                onChange={(e) => setUser({ ...user, name: e.target.value })}
+                placeholder="Masukkan namamu..."
+                className="w-full p-5 text-xl border-2 border-blue-300 rounded-xl focus:outline-none focus:border-blue-600 focus:ring-4 focus:ring-blue-100 transition-all shadow-sm"
+              />
+            </div>
+            <div>
+              <label className="block text-xl font-bold text-gray-700 mb-2">Asal Sekolah</label>
+              <input 
+                type="text" 
+                value={user.school}
+                onChange={(e) => setUser({ ...user, school: e.target.value })}
+                placeholder="Contoh: SMPN 1 Nusantara"
+                className="w-full p-5 text-xl border-2 border-blue-300 rounded-xl focus:outline-none focus:border-blue-600 focus:ring-4 focus:ring-blue-100 transition-all shadow-sm"
+              />
+            </div>
+            
+            <button 
+              onClick={() => {
+                if(user.name && user.school) setCurrentView('dashboard');
+                else alert("Silakan isi nama dan asal sekolah terlebih dahulu!");
+              }}
+              className="w-full mt-4 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white font-bold text-2xl py-5 rounded-xl shadow-lg transform hover:scale-[1.02] transition-all flex items-center justify-center gap-3 touch-manipulation"
+            >
+              <Play fill="white" /> Mulai Eksplorasi
+            </button>
+          </div>
+        </div>
+      </div>
+      
+      {/* Fullscreen control for Home */}
+      <button onClick={toggleFullscreen} className="absolute top-6 right-6 p-4 bg-white/20 hover:bg-white/40 backdrop-blur-md rounded-full text-white shadow-lg transition-all touch-manipulation">
+        {isFullscreen ? <Minimize size={36} /> : <Maximize size={36} />}
+      </button>
+    </div>
+  );
+
+  const renderDashboard = () => (
+    <div className="min-h-screen bg-slate-100 p-8">
+      <Header title={`Halo, ${user.name}! 👋`} showBack={false} />
+      
+      <div className="max-w-7xl mx-auto">
+        <div className="bg-white rounded-2xl shadow-lg p-6 mb-10 border-l-8 border-blue-600 flex items-center justify-between">
+          <div>
+            <h2 className="text-3xl font-bold text-gray-800">Pusat Kendali Misi IPS</h2>
+            <p className="text-xl text-gray-600 mt-2">Asal Pangkalan: {user.school}</p>
+          </div>
+          
+          {/* Progress Overview */}
+          <div className="flex items-center gap-6">
+            <div className="text-right">
+              <p className="text-lg font-bold text-gray-500 uppercase tracking-wider">Status Misi</p>
+              <p className="text-3xl font-extrabold text-blue-700">{calculateProgress()}% Selesai</p>
+            </div>
+            <div className="w-24 h-24 rounded-full border-8 border-gray-200 relative flex items-center justify-center">
+               <svg className="absolute top-0 left-0 w-full h-full transform -rotate-90">
+                 <circle cx="40" cy="40" r="36" fill="transparent" stroke="#e5e7eb" strokeWidth="8" />
+                 <circle cx="40" cy="40" r="36" fill="transparent" stroke="#3b82f6" strokeWidth="8" 
+                         strokeDasharray="226" strokeDashoffset={226 - (226 * calculateProgress()) / 100} 
+                         className="transition-all duration-1000 ease-out" />
+               </svg>
+               <span className="text-2xl font-bold text-blue-600">{calculateProgress()}%</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Menu Grid - Huge buttons for Interactive Flat Panel */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          
+          <button onClick={() => setCurrentView('tujuan')} className="group bg-white rounded-3xl p-8 shadow-xl hover:shadow-2xl border-2 border-transparent hover:border-indigo-400 transition-all text-left flex items-start gap-8 touch-manipulation transform hover:-translate-y-2">
+            <div className="bg-indigo-100 p-6 rounded-2xl group-hover:bg-indigo-600 group-hover:text-white transition-colors">
+              <Target size={64} className="text-indigo-600 group-hover:text-white" />
+            </div>
+            <div>
+              <h3 className="text-3xl font-bold text-gray-800 mb-3 group-hover:text-indigo-700">Tujuan & Panduan</h3>
+              <p className="text-xl text-gray-600 leading-relaxed">Pelajari apa yang akan kamu capai dan bagaimana menggunakan simulator ini.</p>
+            </div>
+          </button>
+
+          <button onClick={() => setCurrentView('materi')} className="group bg-white rounded-3xl p-8 shadow-xl hover:shadow-2xl border-2 border-transparent hover:border-cyan-400 transition-all text-left flex items-start gap-8 touch-manipulation transform hover:-translate-y-2">
+            <div className="bg-cyan-100 p-6 rounded-2xl group-hover:bg-cyan-600 group-hover:text-white transition-colors">
+              <BookOpen size={64} className="text-cyan-600 group-hover:text-white" />
+            </div>
+            <div>
+              <h3 className="text-3xl font-bold text-gray-800 mb-3 group-hover:text-cyan-700">Rangkuman Materi</h3>
+              <p className="text-xl text-gray-600 leading-relaxed">Pahami konsep dasar kondisi geografis dan konektivitas ruang sebelum berpetualang.</p>
+            </div>
+          </button>
+
+          <button onClick={() => setCurrentView('petualang')} className="group bg-gradient-to-br from-emerald-500 to-teal-700 rounded-3xl p-8 shadow-xl hover:shadow-2xl border-4 border-transparent hover:border-yellow-400 transition-all text-left flex items-start gap-8 touch-manipulation transform hover:-translate-y-2 relative overflow-hidden">
+             {/* Decor */}
+            <div className="absolute top-0 right-0 p-8 opacity-20">
+              <Map size={150} color="white" />
+            </div>
+            <div className="bg-white/20 p-6 rounded-2xl backdrop-blur-sm z-10">
+              <Map size={64} className="text-white" />
+            </div>
+            <div className="z-10 text-white">
+              <h3 className="text-4xl font-extrabold mb-3 text-yellow-300 drop-shadow-md">Ayo Berpetualang!</h3>
+              <p className="text-xl text-emerald-50 leading-relaxed font-medium">Taklukkan 3 Level tantangan HOTS seputar kekayaan bumi Nusantara.</p>
+            </div>
+          </button>
+
+          <button onClick={() => setCurrentView('asesmen')} className="group bg-white rounded-3xl p-8 shadow-xl hover:shadow-2xl border-2 border-transparent hover:border-purple-400 transition-all text-left flex items-start gap-8 touch-manipulation transform hover:-translate-y-2">
+            <div className="bg-purple-100 p-6 rounded-2xl group-hover:bg-purple-600 group-hover:text-white transition-colors">
+              <Trophy size={64} className="text-purple-600 group-hover:text-white" />
+            </div>
+            <div>
+              <h3 className="text-3xl font-bold text-gray-800 mb-3 group-hover:text-purple-700">Asesmen Sumatif (Proyek)</h3>
+              <p className="text-xl text-gray-600 leading-relaxed">Uji pemahamanmu dengan merancang sebuah proyek aksi nyata yang menantang.</p>
+            </div>
+          </button>
+
+        </div>
+      </div>
+    </div>
+  );
+
+  const renderTujuan = () => (
+    <div className="min-h-screen bg-slate-50 p-8">
+      <Header title="Tujuan Pembelajaran & Panduan" />
+      <div className="max-w-6xl mx-auto space-y-8">
+        <div className="bg-white p-10 rounded-3xl shadow-lg border-t-8 border-indigo-500">
+          <h2 className="text-4xl font-bold text-indigo-900 mb-6 flex items-center gap-4">
+            <Target className="text-indigo-500" size={48} /> Tujuan Pembelajaran
+          </h2>
+          <p className="text-2xl text-gray-700 leading-relaxed font-medium bg-indigo-50 p-6 rounded-2xl border border-indigo-100">
+            Melalui aplikasi interaktif ini, kamu diharapkan mampu: <br/><br/>
+            <strong className="text-indigo-800">"Memahami keberagaman kondisi geografis Indonesia, menganalisis konektivitas antar ruang, dan mengevaluasi dampaknya terhadap pemanfaatan potensi sumber daya alam (SDA) secara berkelanjutan."</strong>
+          </p>
+        </div>
+
+        <div className="bg-white p-10 rounded-3xl shadow-lg border-t-8 border-cyan-500">
+          <h2 className="text-3xl font-bold text-cyan-900 mb-6 flex items-center gap-4">
+            <CheckCircle className="text-cyan-500" size={40} /> Panduan Penggunaan Simulator (IFP)
+          </h2>
+          <ul className="space-y-6 text-xl text-gray-700">
+            <li className="flex items-start gap-4">
+              <div className="bg-cyan-100 p-2 rounded-full text-cyan-700 font-bold w-12 h-12 flex items-center justify-center shrink-0">1</div>
+              <p>Sentuh menu <strong>Rangkuman Materi</strong> untuk membaca dan menyegarkan ingatanmu tentang letak geografis dan potensi Indonesia.</p>
+            </li>
+            <li className="flex items-start gap-4">
+              <div className="bg-cyan-100 p-2 rounded-full text-cyan-700 font-bold w-12 h-12 flex items-center justify-center shrink-0">2</div>
+              <p>Masuk ke menu <strong>Ayo Berpetualang!</strong> Selesaikan 3 Level pulau. Setiap level memiliki 3 tingkat kesulitan (Mudah, Sedang, Sulit).</p>
+            </li>
+            <li className="flex items-start gap-4">
+              <div className="bg-cyan-100 p-2 rounded-full text-cyan-700 font-bold w-12 h-12 flex items-center justify-center shrink-0">3</div>
+              <p>Ketikkan jawaban uraian analisismu (HOTS) pada kotak yang disediakan menggunakan *on-screen keyboard* panel. Dapatkan lencana 3D setiap berhasil menjawab!</p>
+            </li>
+            <li className="flex items-start gap-4">
+              <div className="bg-cyan-100 p-2 rounded-full text-cyan-700 font-bold w-12 h-12 flex items-center justify-center shrink-0">4</div>
+              <p>Setelah selesai, buka <strong>Asesmen Sumatif</strong> untuk melihat instruksi Proyek Akhir berbasis aktivitas praktik.</p>
+            </li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  );
+
+  const renderMateri = () => (
+    <div className="min-h-screen bg-slate-50 p-8">
+      <Header title="Rangkuman Materi" />
+      <div className="max-w-6xl mx-auto bg-white rounded-3xl shadow-xl overflow-hidden">
+        <div className="bg-cyan-700 p-8 text-white">
+          <h2 className="text-4xl font-extrabold">{materiData.title}</h2>
+          <p className="text-xl text-cyan-100 mt-4">Pelajari rangkuman di bawah ini sebagai bekal analisismu di sesi Petualangan.</p>
+        </div>
+        
+        <div className="p-10 space-y-10">
+          {materiData.content.map((item, index) => (
+            <div key={index} className="flex gap-8 items-start hover:bg-slate-50 p-6 rounded-2xl transition-colors">
+              <div className="bg-cyan-100 text-cyan-700 p-4 rounded-2xl shrink-0">
+                <BookOpen size={48} />
+              </div>
+              <div>
+                <h3 className="text-3xl font-bold text-gray-800 mb-4">{item.subtitle}</h3>
+                <p className="text-2xl text-gray-600 leading-relaxed text-justify">{item.text}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+
+  const renderPetualang = () => {
+    // 3D Success Overlay
+    if (show3DSuccess) {
+      return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm perspective-1000">
+          <div className="text-center flex flex-col items-center">
+            <div className="preserve-3d animate-spin-3d mb-8 relative w-64 h-64 flex items-center justify-center">
+              {/* Gold Coin / Badge 3D representation via CSS */}
+              <div className="absolute w-64 h-64 bg-gradient-to-br from-yellow-300 via-yellow-500 to-yellow-700 rounded-full border-8 border-yellow-200 shadow-[0_0_50px_rgba(250,204,21,0.8)] flex items-center justify-center backface-hidden">
+                 <Star size={120} fill="white" className="text-white opacity-80" />
+              </div>
+            </div>
+            <h1 className="text-6xl font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 to-yellow-600 drop-shadow-lg mb-4">
+              LUAR BIASA!
+            </h1>
+            <p className="text-3xl text-white font-medium">Analisis yang sangat kritis! Lencana berhasil diraih.</p>
+          </div>
+        </div>
+      );
+    }
+
+    // Question Screen
+    if (activeChallenge && activeLevel) {
+      const q = tantanganData[activeLevel][activeChallenge];
+      const isCompleted = progress[activeLevel][activeChallenge];
+
+      return (
+        <div className="min-h-screen bg-slate-50 p-8">
+          <div className="flex justify-between items-center bg-emerald-700 text-white p-6 shadow-md rounded-b-2xl mb-8">
+            <div className="flex items-center gap-4">
+              <button onClick={() => setActiveChallenge(null)} className="p-3 bg-emerald-600 hover:bg-emerald-500 rounded-full transition-colors touch-manipulation">
+                <ArrowLeft size={32} />
+              </button>
+              <h1 className="text-4xl font-bold">Tantangan: {activeChallenge.toUpperCase()}</h1>
+            </div>
+          </div>
+
+          <div className="max-w-5xl mx-auto bg-white p-10 rounded-3xl shadow-2xl">
+            <div className="bg-orange-50 border-l-8 border-orange-500 p-8 rounded-r-2xl mb-8">
+              <p className="text-3xl font-semibold text-gray-800 leading-relaxed text-justify">
+                {q}
+              </p>
+            </div>
+
+            <div className="space-y-6">
+              <label className="block text-2xl font-bold text-gray-700">Area Analisis (Jawaban Uraian)</label>
+              <textarea 
+                className="w-full h-64 p-6 text-2xl border-4 border-gray-200 rounded-2xl focus:outline-none focus:border-emerald-500 focus:ring-8 focus:ring-emerald-100 transition-all resize-none"
+                placeholder={isCompleted ? "Tantangan ini sudah diselesaikan!" : "Ketik jawaban analisismu di sini secara detail..."}
+                value={isCompleted ? "Tantangan Telah Diselesaikan ✔️\n\nJawabanmu: " + answer : answer}
+                onChange={(e) => setAnswer(e.target.value)}
+                disabled={isCompleted || isLoadingAI}
+              ></textarea>
+              
+              {!isCompleted && !isLoadingAI && (
+                <button 
+                  onClick={handleSubmitAnswer}
+                  className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-3xl py-6 rounded-2xl shadow-xl transform hover:scale-[1.01] transition-all touch-manipulation flex justify-center items-center gap-4"
+                >
+                  <Sparkles size={40} className="text-yellow-300" /> Minta Penilaian AI Pak Barak
+                </button>
+              )}
+
+              {isLoadingAI && (
+                <div className="w-full bg-emerald-100 text-emerald-800 font-bold text-2xl py-6 rounded-2xl flex justify-center items-center gap-4 animate-pulse border-2 border-emerald-300">
+                  <Loader2 size={40} className="animate-spin" /> Sedang dianalisis oleh AI Pak Barak...
+                </div>
+              )}
+
+              {isCompleted && feedbacks[activeLevel]?.[activeChallenge] && (
+                <div className="mt-8 bg-blue-50 border-l-8 border-blue-500 p-8 rounded-r-2xl animate-fade-in shadow-inner">
+                  <div className="flex items-center gap-4 mb-4 text-blue-800">
+                    <Bot size={40} />
+                    <h3 className="text-2xl font-bold">Feedback AI Pak Barak:</h3>
+                  </div>
+                  <div className="text-xl text-gray-700 leading-relaxed whitespace-pre-line font-medium">
+                    {feedbacks[activeLevel][activeChallenge]}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // Level Selection Screen
+    return (
+      <div className="min-h-screen bg-slate-100 p-8">
+        <Header title="Peta Petualangan Nusantara" />
+        
+        <div className="max-w-7xl mx-auto grid gap-8">
+          {['level1', 'level2', 'level3'].map((lvl, idx) => {
+            const isUnlocked = isLevelUnlocked(lvl);
+            const data = tantanganData[lvl];
+            const prog = progress[lvl];
+            const completedCount = [prog.mudah, prog.sedang, prog.sulit].filter(Boolean).length;
+            const isAllClear = completedCount === 3;
+
+            return (
+              <div key={lvl} className={`relative overflow-hidden rounded-3xl shadow-xl transition-all ${isUnlocked ? 'bg-white border-2 border-emerald-500' : 'bg-gray-200 border-2 border-gray-300 opacity-80'}`}>
+                
+                {/* Visual Status Indicator Background */}
+                {isAllClear && <div className="absolute inset-0 bg-green-50 z-0"></div>}
+
+                <div className="relative z-10 p-8 flex flex-col md:flex-row items-center gap-8">
+                  
+                  {/* Icon Status */}
+                  <div className={`p-8 rounded-full shrink-0 ${isUnlocked ? (isAllClear ? 'bg-green-500 text-white' : 'bg-emerald-100 text-emerald-600') : 'bg-gray-300 text-gray-500'}`}>
+                    {!isUnlocked ? <Lock size={64} /> : (isAllClear ? <Award size={64} /> : <Map size={64} />)}
+                  </div>
+
+                  {/* Info */}
+                  <div className="flex-grow text-center md:text-left">
+                    <h2 className={`text-4xl font-extrabold mb-2 ${isUnlocked ? 'text-gray-800' : 'text-gray-500'}`}>
+                      {data.title}
+                    </h2>
+                    <p className="text-xl text-gray-600 font-medium">
+                      Status Tantangan: {completedCount} / 3 Selesai
+                    </p>
+                    
+                    {/* Progress Dots */}
+                    <div className="flex gap-3 mt-4 justify-center md:justify-start">
+                      {['mudah', 'sedang', 'sulit'].map((diff) => (
+                        <div key={diff} className={`h-4 w-16 rounded-full ${prog[diff] ? 'bg-green-500 shadow-[0_0_10px_rgba(34,197,94,0.6)]' : 'bg-gray-300'}`}></div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Actions / Buttons */}
+                  {isUnlocked ? (
+                    <div className="flex gap-4 w-full md:w-auto">
+                      {['mudah', 'sedang', 'sulit'].map((diff) => {
+                        const done = prog[diff];
+                        const diffColors = {
+                           mudah: 'from-blue-400 to-blue-600 hover:from-blue-500 hover:to-blue-700',
+                           sedang: 'from-orange-400 to-orange-600 hover:from-orange-500 hover:to-orange-700',
+                           sulit: 'from-red-500 to-red-700 hover:from-red-600 hover:to-red-800',
+                        };
+                        return (
+                          <button 
+                            key={diff}
+                            onClick={() => { setActiveLevel(lvl); setActiveChallenge(diff); }}
+                            className={`flex-1 md:flex-none px-6 py-4 rounded-xl font-bold text-white text-xl shadow-lg transform hover:scale-105 transition-all touch-manipulation flex flex-col items-center justify-center gap-2 ${done ? 'bg-green-600' : `bg-gradient-to-b ${diffColors[diff]}`}`}
+                          >
+                            {done ? <CheckCircle size={32} /> : <Target size={32} />}
+                            <span className="capitalize">{diff}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="text-xl font-bold text-gray-500 bg-gray-200 px-8 py-4 rounded-xl">
+                      Selesaikan Level Sebelumnya!
+                    </div>
+                  )}
+
+                </div>
+              </div>
+            );
+          })}
+          
+          {calculateProgress() === 100 && (
+             <div className="bg-gradient-to-r from-yellow-400 to-yellow-600 text-white p-10 rounded-3xl shadow-2xl text-center transform scale-100 animate-pulse">
+               <Trophy size={80} className="mx-auto mb-6 drop-shadow-xl" />
+               <h2 className="text-5xl font-black mb-4 drop-shadow-md">SELAMAT PENJELAJAH!</h2>
+               <p className="text-2xl font-medium">Kamu telah menguasai analisis geografi Nusantara. Lanjutkan ke menu Asesmen Sumatif!</p>
+             </div>
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  const renderAsesmen = () => (
+    <div className="min-h-screen bg-slate-50 p-8">
+      <Header title="Asesmen Sumatif (Proyek Aksi)" />
+      
+      <div className="max-w-6xl mx-auto bg-white rounded-3xl shadow-2xl overflow-hidden border-4 border-purple-500 relative">
+        {/* Banner */}
+        <div className="bg-purple-700 p-12 text-center text-white relative overflow-hidden">
+           {/* Decor */}
+           <div className="absolute opacity-10 right-0 top-0 transform translate-x-1/4 -translate-y-1/4">
+              <Trophy size={400} />
+           </div>
+           <h2 className="text-5xl font-extrabold relative z-10 uppercase tracking-widest drop-shadow-lg">Proyek Jelajah Nusantara</h2>
+           <h3 className="text-3xl font-medium mt-4 relative z-10 text-purple-200">"Peta Potensi Daerahku & Strategi Konektivitas"</h3>
+        </div>
+
+        <div className="p-12 space-y-10">
+          <div className="bg-purple-50 p-8 rounded-2xl border-l-8 border-purple-500">
+             <h4 className="text-3xl font-bold text-purple-900 mb-4">Misi Utamamu:</h4>
+             <p className="text-2xl text-gray-700 leading-relaxed text-justify">
+               Buatlah sebuah <strong>Peta Tematik (Fisik/Digital)</strong> dari daerah tempat tinggalmu atau provinsi pilihanmu. Identifikasi minimal 3 potensi sumber daya alam unggulan, kemudian rancanglah sebuah <strong>Proposal Mini/Poster</strong> yang menganalisis bagaimana SDA tersebut dapat didistribusikan (konektivitas ruang) untuk meningkatkan ekonomi lokal tanpa merusak lingkungan.
+             </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+             <div className="border-2 border-gray-200 rounded-2xl p-8 hover:shadow-lg transition-shadow">
+                <div className="flex items-center gap-4 mb-4 text-purple-700">
+                  <Map size={40} />
+                  <h4 className="text-2xl font-bold">Langkah 1: Pemetaan</h4>
+                </div>
+                <p className="text-xl text-gray-600">Gambarkan letak geografis/astronomis. Beri simbol khusus untuk lokasi potensi SDA (pertanian, tambang, hutan, laut).</p>
+             </div>
+             
+             <div className="border-2 border-gray-200 rounded-2xl p-8 hover:shadow-lg transition-shadow">
+                <div className="flex items-center gap-4 mb-4 text-purple-700">
+                  <Target size={40} />
+                  <h4 className="text-2xl font-bold">Langkah 2: Analisis HOTS</h4>
+                </div>
+                <p className="text-xl text-gray-600">Jelaskan mengapa SDA tersebut ada di daerah itu (pengaruh iklim/tanah) dan bagaimana konektivitas transportasinya saat ini.</p>
+             </div>
+
+             <div className="border-2 border-gray-200 rounded-2xl p-8 hover:shadow-lg transition-shadow md:col-span-2">
+                <div className="flex items-center gap-4 mb-4 text-purple-700">
+                  <Award size={40} />
+                  <h4 className="text-2xl font-bold">Langkah 3: Solusi Berkelanjutan (Karya)</h4>
+                </div>
+                <p className="text-xl text-gray-600">Buat rancangan perbaikan konektivitas (misal usulan rute baru, perbaikan pelabuhan) agar nilai jual SDA meningkat, serta tuliskan aturan agar eksploitasi SDA tidak menimbulkan bencana alam.</p>
+             </div>
+          </div>
+
+          {/* AI Project Generator Section */}
+          <div className="bg-gradient-to-r from-indigo-50 to-purple-50 rounded-2xl p-8 border border-indigo-200 shadow-md">
+            <h4 className="text-3xl font-bold text-indigo-900 mb-4 flex items-center gap-3">
+              <Bot className="text-indigo-600" size={36} /> Bingung Mulai Darimana? Tanya AI Asisten!
+            </h4>
+            <p className="text-xl text-gray-700 mb-6">Masukkan nama daerah/provinsimu, AI akan memberikan ide potensi SDA dan konektivitas yang menarik untuk diangkat menjadi proyek.</p>
+            
+            <div className="flex flex-col md:flex-row gap-4 mb-6">
+              <input 
+                type="text" 
+                value={projectRegion}
+                onChange={(e) => setProjectRegion(e.target.value)}
+                placeholder="Contoh: Jawa Barat, Maluku, Kalimantan Timur..."
+                className="flex-grow p-5 text-xl border-2 border-indigo-300 rounded-xl focus:outline-none focus:border-indigo-600 focus:ring-4 focus:ring-indigo-100"
+              />
+              <button 
+                onClick={handleGenerateProjectIdeas}
+                disabled={isGeneratingProject}
+                className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-2xl py-4 px-8 rounded-xl shadow-lg transition-all flex items-center justify-center gap-3 disabled:opacity-70 touch-manipulation"
+              >
+                {isGeneratingProject ? <Loader2 className="animate-spin" size={32} /> : <Sparkles className="text-yellow-300" size={32} />}
+                {isGeneratingProject ? "Mencari Ide..." : "Berikan Ide Proyek"}
+              </button>
+            </div>
+
+            {projectIdeas && (
+              <div className="bg-white p-6 rounded-xl border border-indigo-100 shadow-inner">
+                <p className="text-xl text-gray-800 leading-relaxed whitespace-pre-line font-medium">
+                  {projectIdeas}
+                </p>
+              </div>
+            )}
+          </div>
+
+          <div className="text-center mt-12 bg-gray-100 p-8 rounded-2xl">
+             <p className="text-2xl font-bold text-gray-800 mb-2">Kumpulkan karya fisik/digitalmu kepada Pak Barak Shaputra!</p>
+             <p className="text-xl text-gray-500">Gunakan kreativitas terbaikmu, kamu adalah agen perubahan tata ruang Indonesia!</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
+  // --- MAIN RENDER ROUTER ---
+  return (
+    <>
+      <style>{customStyles}</style>
+      <div className="font-sans text-gray-900 selection:bg-blue-300 antialiased overflow-x-hidden">
+        {currentView === 'home' && renderHome()}
+        {currentView === 'dashboard' && renderDashboard()}
+        {currentView === 'tujuan' && renderTujuan()}
+        {currentView === 'materi' && renderMateri()}
+        {currentView === 'petualang' && renderPetualang()}
+        {currentView === 'asesmen' && renderAsesmen()}
+      </div>
+    </>
+  );
+}
